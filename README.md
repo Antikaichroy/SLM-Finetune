@@ -65,6 +65,33 @@ flowchart LR
 
 ![MOL SLM Pipeline Architecture](docs/architecture.png)
 
+## Training Information & Curves
+
+Run configuration for this reported experiment:
+
+- Epochs: `1`
+- Total steps: `8,000`
+- Logging interval for this visualization: every `1,000` steps
+- Training loss range: `3.28 -> 0.56`
+- Validation loss range (similar trend): `3.34 -> 0.62`
+
+| Training Loss Curve | Validation Loss Curve |
+|---|---|
+| ![Training Loss Curve](docs/training_loss_curve.png) | ![Validation Loss Curve](docs/validation_loss_curve.png) |
+
+Sampled points used for plotting:
+
+| Step | Train Loss | Validation Loss |
+|---|---:|---:|
+| 1,000 | 3.28 | 3.34 |
+| 2,000 | 2.63 | 3.14 |
+| 3,000 | 2.25 | 3.02 |
+| 4,000 | 1.82 | 2.98 |
+| 5,000 | 1.57 | 2.35 |
+| 6,000 | 1.53 | 1.45 |
+| 7,000 | 1.09 | 1.15 |
+| 8,000 | 0.56 | 0.62 |
+
 ## Repository Structure
 
 ```text
@@ -74,7 +101,9 @@ flowchart LR
 ├── step3_infer.py
 ├── requirements.txt
 └── docs/
-    └── architecture.png
+    ├── architecture.png
+    ├── training_loss_curve.png
+    └── validation_loss_curve.png
 ```
 
 ## Requirements
