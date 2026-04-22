@@ -1,136 +1,134 @@
-# MOL SLM: Shipping Domain Fine-Tuning Pipeline
+# MOL SLM: Grouped Augmentation Fine-Tuning for Shipping Q&A
+
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![CUDA 12.x Recommended](https://img.shields.io/badge/CUDA-12.x-76B900?logo=nvidia&logoColor=white)](https://developer.nvidia.com/cuda-toolkit)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/get-started/locally/)
+[![Hugging Face Transformers](https://img.shields.io/badge/HuggingFace-Transformers-FFD21E?logo=huggingface&logoColor=black)](https://huggingface.co/docs/transformers/index)
+[![Ollama llama3.1:8b](https://img.shields.io/badge/Ollama-llama3.1%3A8b-111111)](https://ollama.com/library/llama3.1)
+
+> Train a shipping-domain assistant that learns **one intent expressed in multiple ways** by optimizing a **single grouped loss** per example.
+
+## At a Glance
+
+| Component | What it does |
+|---|---|
+| `step1_augment.py` | Expands each input question into 5 paraphrases + soft answers using Ollama |
+| `step2_train.py` | Fine-tunes Gemma with grouped weighted loss: anchor + 5 soft pairs |
+| `step3_infer.py` | Loads the fine-tuned model and runs interactive Q&A |
+
+## Why This Training Signal Is Stronger
+
+A single CSV row starts as one anchor pair: `(question, answer)`.
+
+Step 1 creates 5 paraphrased questions that preserve intent, then generates soft answers for each. Now each training group contains:
+
+- 1 anchor pair (ground truth)
+- 5 soft pairs (semantic variants)
+
+During Step 2, the model does **not** update after each pair independently. Instead, it processes all 6 pairs from the same intent group and performs one grouped update:
 
 ```text
-Python
-- Python >= 3.10
-- pip >= 23
+L_group = 0.55 * L_anchor + 0.45 * mean(L_soft_1 ... L_soft_5)
 ```
 
-```text
-CUDA / GPU
-- NVIDIA GPU recommended for training
-- CUDA 12.x recommended
-- BF16-capable GPU preferred (A100/3090/4090 class)
+This means the model sees multiple phrasings of the same user intent together before the optimizer step. That creates a richer gradient signal because:
+
+1. Anchor pair keeps the update tied to real labeled behavior.
+2. Paraphrases teach invariance to wording and sentence structure.
+3. One grouped backward pass aligns the update across all variants of that intent.
+
+## Training Flow (Intent Group View)
+
+```mermaid
+flowchart LR
+    A[Anchor Question\nWhat is delivery status of order 123?] --> B[Paraphrase x5\nDifferent wording, same intent]
+    B --> C[Soft Answers x5\nLLM-generated]
+    A --> D[Group G = 1 anchor + 5 soft pairs]
+    C --> D
+    D --> E[Forward passes for all 6 pairs]
+    E --> F[Grouped loss\n0.55*L_anchor + 0.45*mean(L_soft)]
+    F --> G[Single backward pass]
+    G --> H[Single optimizer step\nGradient update for that intent]
 ```
 
-```text
-Hugging Face
-- Internet access to download base model and tokenizer
-- Default base model: google/gemma-3-1b-it
-- Ensure HF access permissions are available in your environment
-```
+## System Architecture
 
-```text
-Ollama
-- Ollama server running at http://localhost:11434
-- Required model: llama3.1:8b
-```
-
-```bash
-Install Dependencies
-pip install -r requirements.txt
-
-# Install PyTorch for your runtime (example: CUDA 12.8)
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
-```
-
-This repository implements a 3-step workflow to build a shipping/logistics assistant model:
-1. Augment Q&A data with paraphrases and soft labels.
-2. Fine-tune a Gemma instruction model using group-weighted loss.
-3. Run interactive inference on the fine-tuned checkpoint.
-
-## Project Purpose
-
-The goal is to improve robustness to user phrasing variation by training with grouped examples:
-- 1 ground-truth pair (`question`, `answer`) from your CSV.
-- 5 synthetic paraphrase/answer pairs generated via Ollama.
-
-During training, each group contributes a weighted objective:
-- Ground-truth loss: `0.55`
-- Soft-label mean loss: `0.45`
+![MOL SLM Pipeline Architecture](docs/architecture.png)
 
 ## Repository Structure
 
 ```text
 .
-├── step1_augment.py   # Generate grouped augmentation JSONL via Ollama
-├── step2_train.py     # Fine-tune Gemma with grouped weighted loss
-├── step3_infer.py     # Interactive inference loop
+├── step1_augment.py
+├── step2_train.py
+├── step3_infer.py
 ├── requirements.txt
 └── docs/
     └── architecture.png
 ```
 
-## Architecture
+## Requirements
 
-![MOL SLM Pipeline Architecture](docs/architecture.png)
+- Python `>= 3.10`
+- `pip >= 23`
+- Ollama server running at `http://localhost:11434`
+- Ollama model: `llama3.1:8b`
+- GPU strongly recommended for training (BF16-capable preferred)
 
-## Code Flow
+## Install
 
-### Step 1: Augmentation (`step1_augment.py`)
-- Reads `shipping_data.csv` with columns `question`, `answer`.
-- For each row:
-  - Generates 5 paraphrased questions.
-  - Generates soft-label answers for each paraphrase.
-- Writes grouped records to `augmented_groups.jsonl`:
-  - `anchor`: original QA (ground truth)
-  - `soft`: 5 synthetic QA pairs
+```bash
+pip install -r requirements.txt
 
-### Step 2: Training (`step2_train.py`)
-- Loads `augmented_groups.jsonl`.
-- Loads base model/tokenizer (`google/gemma-3-1b-it` by default).
-- For each group:
-  - Computes one loss per pair (anchor + 5 soft).
-  - Combines with weighted objective:
-    - `L = 0.55 * L_ground_truth + 0.45 * mean(L_soft_1..5)`
-  - Performs one backward pass and optimizer step per group.
-- Saves checkpoints periodically and final model to `./gemma_finetuned`.
+# Install PyTorch matching your environment.
+# Example (CUDA 12.8):
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+```
 
-### Step 3: Inference (`step3_infer.py`)
-- Loads tokenizer/model from `./gemma_finetuned`.
-- Accepts interactive questions from terminal.
-- Generates answer text with controlled sampling (`temperature=0.3`).
+## Input Data Format
 
-## Setup
+Create `shipping_data.csv` in the repo root:
 
-1. Install dependencies.
-2. Start Ollama:
-   ```bash
-   ollama serve
-   ```
-3. Pull augmentation model:
-   ```bash
-   ollama pull llama3.1:8b
-   ```
-4. Prepare `shipping_data.csv` in repo root:
-   ```csv
-   question,answer
-   What is the delivery status of order #123?,The order is in transit.
-   ```
+```csv
+question,answer
+What is the delivery status of order #123?,The order is in transit.
+```
 
 ## Run Pipeline
 
-1. Data augmentation:
-   ```bash
-   python step1_augment.py
-   ```
-2. Fine-tuning:
-   ```bash
-   python step2_train.py
-   ```
-3. Inference:
-   ```bash
-   python step3_infer.py
-   ```
+1. Start Ollama and pull model:
+
+```bash
+ollama serve
+ollama pull llama3.1:8b
+```
+
+2. Generate grouped augmented data:
+
+```bash
+python step1_augment.py
+```
+
+3. Fine-tune with grouped weighted loss:
+
+```bash
+python step2_train.py
+```
+
+4. Run inference:
+
+```bash
+python step3_infer.py
+```
 
 ## Outputs
 
-- `augmented_groups.jsonl`: grouped augmentation dataset.
-- `./gemma_finetuned/`: final fine-tuned model + tokenizer.
-- `./gemma_finetuned/checkpoint-step*/`: intermediate checkpoints.
+- `augmented_groups.jsonl` - grouped dataset (`1 anchor + 5 soft` per row)
+- `./gemma_finetuned/` - final model + tokenizer
+- `./gemma_finetuned/checkpoint-step*/` - intermediate checkpoints
 
-## Notes
+## Implementation Notes
 
-- Update config constants at the top of each script (paths, model IDs, training params) before large runs.
-- `step1_augment.py` supports resume behavior by skipping already-written group IDs.
-- Training and inference are functional on CPU, but GPU is recommended for practical runtimes.
+- Resume support exists in Step 1 (already processed `group_id` values are skipped).
+- Step 2 uses one optimizer step per group, not per pair.
+- Default base model is `google/gemma-3-1b-it` (editable in script config).
