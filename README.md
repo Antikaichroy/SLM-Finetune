@@ -1,21 +1,36 @@
 # MOL SLM: Shipping Domain Fine-Tuning Pipeline
 
 ```text
-Requirements
-- Python 3.10+
-- Ollama running locally (http://localhost:11434)
-- Ollama model pulled: llama3.1:8b
-- Input CSV file: shipping_data.csv with columns [question, answer]
-- GPU strongly recommended for training (bf16 + gradient checkpointing)
+Python
+- Python >= 3.10
+- pip >= 23
+```
+
+```text
+CUDA / GPU
+- NVIDIA GPU recommended for training
+- CUDA 12.x recommended
+- BF16-capable GPU preferred (A100/3090/4090 class)
+```
+
+```text
+Hugging Face
+- Internet access to download base model and tokenizer
+- Default base model: google/gemma-3-1b-it
+- Ensure HF access permissions are available in your environment
+```
+
+```text
+Ollama
+- Ollama server running at http://localhost:11434
+- Required model: llama3.1:8b
 ```
 
 ```bash
-Dependencies
-# Base project deps
+Install Dependencies
 pip install -r requirements.txt
 
-# PyTorch (install variant matching your CUDA/CPU environment)
-# Example for CUDA 12.8:
+# Install PyTorch for your runtime (example: CUDA 12.8)
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 ```
 
