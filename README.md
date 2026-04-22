@@ -16,6 +16,16 @@
 | `step2_train.py` | Fine-tunes Gemma with grouped weighted loss: anchor + 5 soft pairs |
 | `step3_infer.py` | Loads the fine-tuned model and runs interactive Q&A |
 
+## Dataset Information
+
+- Corpus source: ClassNK domain corpus
+- Corpus size: approximately 6 million tokens
+- QA synthesis model: Qwen3-14B
+- Generated dataset size: 50K+ `question, answer` rows
+- Generation runtime: approximately 5 days
+- Generation hardware: NVIDIA V100 PCIe
+- Expected local training file in this repo: `shipping_data.csv`
+
 ## Why This Training Signal Is Stronger
 
 A single CSV row starts as one anchor pair: `(question, answer)`.
@@ -46,7 +56,7 @@ flowchart LR
     A --> D[Group G = 1 anchor + 5 soft pairs]
     C --> D
     D --> E[Forward passes for all 6 pairs]
-    E --> F[Grouped loss\n0.55*L_anchor + 0.45*mean(L_soft)]
+    E --> F[Grouped loss\n55 percent anchor + 45 percent soft mean]
     F --> G[Single backward pass]
     G --> H[Single optimizer step\nGradient update for that intent]
 ```
