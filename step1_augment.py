@@ -2,7 +2,7 @@
 Step 1: Augmentation Pipeline
 ==============================
 For each row in your CSV (question, answer):
-  - Uses Ollama (Llama 3.1 8B) to generate 5 paraphrased questions
+  - Uses Ollama (Gemma 3 8B) to generate 5 paraphrased questions
   - Uses Ollama to generate soft-label answers for each paraphrase
   - Saves a JSONL where each line is one GROUP of 6 (q,a) pairs
 
@@ -32,7 +32,7 @@ from tqdm import tqdm
 CSV_PATH          = "shipping_data.csv"       # <-- change to your CSV path
 OUTPUT_JSONL      = "augmented_groups.jsonl"
 OLLAMA_URL        = "http://localhost:11434/api/generate"
-ANCHOR_MODEL      = "llama3.1:8b"
+ANCHOR_MODEL      = "gemma3:8b"
 NUM_PARAPHRASES   = 5
 TEMPERATURE       = 0.7                        # for paraphrase diversity
 ANSWER_TEMPERATURE = 0.3                       # lower = more consistent answers
@@ -68,7 +68,7 @@ def ollama_generate(prompt: str, temperature: float = 0.7) -> str:
 
 
 def generate_paraphrases(question: str) -> list[str]:
-    """Ask Llama to rewrite the question in 5 different ways."""
+    """Ask Gemma to rewrite the question in 5 different ways."""
     prompt = f"""You are a data augmentation assistant for a shipping and logistics domain.
 
 Your task: rewrite the following question in exactly {NUM_PARAPHRASES} different ways.
@@ -104,7 +104,7 @@ Original question: {question}
 
 
 def generate_soft_answer(question: str) -> str:
-    """Ask Llama to answer the paraphrased shipping question."""
+    """Ask Gemma to answer the paraphrased shipping question."""
     prompt = f"""You are an expert shipping and logistics assistant.
 
 Answer the following question clearly and concisely based on general shipping domain knowledge.
